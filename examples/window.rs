@@ -30,7 +30,7 @@ fn main() -> Result<(), impl std::error::Error> {
                 window_id,
             } if window_id == window.id() => control_flow.set_exit(),
             Event::AboutToWait => {
-                window.request_redraw();
+                // window.request_redraw();
             }
             Event::RedrawRequested(_) => {
                 // Notify the windowing system that we'll be presenting to the window.

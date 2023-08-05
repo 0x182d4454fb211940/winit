@@ -14,6 +14,7 @@ mod event_loop;
 mod output;
 mod seat;
 mod state;
+mod tablet;
 mod types;
 mod window;
 

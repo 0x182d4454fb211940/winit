@@ -882,13 +882,21 @@ pub enum PointerEvent {
 pub enum PointerId {
     Cursor,
     Touch { finger: u64 },
+    Pen { tool: Tool },
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum Tool {
+    Pen,
+    Eraser,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Tilt {
-    angle_x: f64,
-    angle_y: f64,
+    pub angle_x: f64,
+    pub angle_y: f64,
 }
 
 /// Describes the force of a touch event

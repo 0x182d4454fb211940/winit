@@ -30,6 +30,7 @@ use super::seat::{
     PointerConstraintsState, RelativePointerState, TextInputState, WinitPointerData,
     WinitPointerDataExt, WinitSeatState,
 };
+use super::tablet::TabletState;
 use super::types::wp_fractional_scaling::FractionalScalingManager;
 use super::types::wp_viewporter::ViewporterState;
 use super::types::xdg_activation::XdgActivationState;
@@ -80,6 +81,8 @@ pub struct WinitState {
     /// The state of the text input on the client.
     pub text_input_state: Option<TextInputState>,
 
+    pub tablet: Option<TabletState>,
+
     /// Observed monitors.
     pub monitors: Arc<Mutex<Vec<MonitorHandle>>>,
 
@@ -125,9 +128,14 @@ impl WinitState {
 
         let seat_state = SeatState::new(globals, queue_handle);
 
+        let mut tablet = TabletState::try_new(globals, queue_handle);
+
         let mut seats = FnvHashMap::default();
         for seat in seat_state.seats() {
             seats.insert(seat.id(), WinitSeatState::new());
+            if let Some(tablet) = tablet.as_mut() {
+                tablet.attach_seat(&seat, queue_handle);
+            }
         }
 
         let (viewporter_state, fractional_scaling_manager) =
@@ -157,6 +165,8 @@ impl WinitState {
 
             seats,
             text_input_state: TextInputState::new(globals, queue_handle).ok(),
+
+            tablet,
 
             relative_pointer: RelativePointerState::new(globals, queue_handle).ok(),
             pointer_constraints: PointerConstraintsState::new(globals, queue_handle)
