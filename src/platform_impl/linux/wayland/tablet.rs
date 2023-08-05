@@ -19,7 +19,10 @@ use wayland_protocols::wp::tablet::zv2::client::{
 
 use crate::{
     dpi::{LogicalPosition, PhysicalPosition},
-    event::{Force, PointerEvent, PointerId, Tilt, Tool, WindowEvent},
+    event::{
+        ElementState, Force, PenButton, PointerButton, PointerEvent, PointerId, Tilt, Tool,
+        WindowEvent,
+    },
     platform_impl::{wayland, wayland::DeviceId},
 };
 
@@ -81,8 +84,8 @@ impl Dispatch<ZwpTabletSeatV2, ()> for WinitState {
     }
 }
 
-#[derive(Default)]
-pub struct ToolData {
+#[derive(Default, Debug)]
+struct ToolData {
     tool_type: OnceCell<Tool>,
 }
 
@@ -98,22 +101,24 @@ impl ToolData {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct ToolState {
     surface: Option<WlSurface>,
     pressure: Option<u32>,
     tilt: Option<Tilt>,
     motion: Option<PhysicalPosition<f64>>,
+    down: bool,
+    up: bool,
 }
 
 impl Dispatch<ZwpTabletToolV2, ToolData> for WinitState {
     fn event(
         state: &mut Self,
-        proxy: &ZwpTabletToolV2,
+        _proxy: &ZwpTabletToolV2,
         event: Event,
         data: &ToolData,
-        conn: &wayland_client::Connection,
-        qhandle: &QueueHandle<Self>,
+        _conn: &wayland_client::Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
         match event {
             Event::Type {
@@ -143,7 +148,11 @@ impl Dispatch<ZwpTabletToolV2, ToolData> for WinitState {
             }
             Event::Motion { x, y } => {
                 let tool_state = data.state_mut(state);
-                let window_id = wayland::make_wid(tool_state.surface.as_ref().unwrap());
+                let surface = match tool_state.surface.as_ref() {
+                    Some(x) => x,
+                    None => return,
+                };
+                let window_id = wayland::make_wid(&surface);
                 let scale_factor = match state.windows.get_mut().get(&window_id) {
                     Some(window) => window.lock().unwrap().scale_factor(),
                     None => return,
@@ -151,6 +160,12 @@ impl Dispatch<ZwpTabletToolV2, ToolData> for WinitState {
                 let tool_state = data.state_mut(state);
                 let location = LogicalPosition::new(x, y);
                 tool_state.motion = Some(location.to_physical(scale_factor));
+            }
+            Event::Down { .. } => {
+                data.state_mut(state).down = true;
+            }
+            Event::Up { .. } => {
+                data.state_mut(state).up = true;
             }
             Event::ProximityIn { surface, .. } => {
                 let tool_state = data.state_mut(state);
@@ -172,7 +187,11 @@ impl Dispatch<ZwpTabletToolV2, ToolData> for WinitState {
             }
             Event::ProximityOut => {
                 let tool_state = data.state_mut(state);
-                let window_id = wayland::make_wid(&tool_state.surface.take().unwrap());
+                let surface = match tool_state.surface.as_ref() {
+                    Some(x) => x,
+                    None => return,
+                };
+                let window_id = wayland::make_wid(&surface);
                 let device_id =
                     crate::event::DeviceId(crate::platform_impl::DeviceId::Wayland(DeviceId));
                 let pointer_id = PointerId::Pen {
@@ -193,32 +212,61 @@ impl Dispatch<ZwpTabletToolV2, ToolData> for WinitState {
                     Some(x) => x,
                     None => return,
                 };
+
                 let window_id = wayland::make_wid(surface);
                 let device_id =
                     crate::event::DeviceId(crate::platform_impl::DeviceId::Wayland(DeviceId));
                 let pointer_id = PointerId::Pen {
                     tool: *data.tool_type.get().unwrap(),
                 };
-                let pressure_event = tool_state.pressure.take().map(|pressure| {
-                    PointerEvent::UpdateForce(Force::Normalized(pressure as f64 / 65535.0))
-                });
-                let tilt_event = tool_state.tilt.take().map(PointerEvent::UpdateTilt);
-                let motion_event = tool_state.motion.take().map(PointerEvent::Moved);
-                for event in [pressure_event, tilt_event, motion_event]
-                    .into_iter()
-                    .flatten()
-                    .map(|event| WindowEvent::Pointer {
-                        device_id,
-                        pointer_id,
-                        event,
-                    })
-                {
-                    state.events_sink.push_window_event(event, window_id);
+                let force = tool_state
+                    .pressure
+                    .take()
+                    .map(|pressure| Force::Normalized(pressure as f64 / 65535.0));
+                let tilt = tool_state.tilt.take();
+                let (down, up) = (
+                    std::mem::take(&mut tool_state.down),
+                    std::mem::take(&mut tool_state.up),
+                );
+                if down || up {
+                    let position = tool_state.motion.take();
+                    state.events_sink.push_window_event(
+                        WindowEvent::Pointer {
+                            device_id,
+                            pointer_id,
+                            event: PointerEvent::Button {
+                                button: PointerButton::Pen(PenButton::Touch),
+                                state: if down {
+                                    ElementState::Pressed
+                                } else {
+                                    ElementState::Released
+                                },
+                                position,
+                                force,
+                                tilt,
+                            },
+                        },
+                        window_id,
+                    );
+                    return;
+                }
+                if let Some(position) = tool_state.motion.take() {
+                    state.events_sink.push_window_event(
+                        WindowEvent::Pointer {
+                            device_id,
+                            pointer_id,
+                            event: PointerEvent::Moved {
+                                position,
+                                force,
+                                tilt,
+                            },
+                        },
+                        window_id,
+                    );
                 }
             }
             _ => (),
         }
-        // println!("!!! {event:?}");
     }
 }
 

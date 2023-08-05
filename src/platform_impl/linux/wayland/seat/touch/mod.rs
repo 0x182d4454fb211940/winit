@@ -36,9 +36,10 @@ impl TouchHandler for WinitState {
         let seat_state = self.seats.get_mut(&touch.seat().id()).unwrap();
 
         // Update the state of the point.
-        seat_state
+        let touch_point = seat_state
             .touch_map
-            .insert(id, TouchPoint { surface, location });
+            .entry(id)
+            .or_insert(TouchPoint { surface, location });
 
         self.events_sink.push_window_event(
             WindowEvent::Pointer {
@@ -49,6 +50,9 @@ impl TouchHandler for WinitState {
                 event: PointerEvent::Button {
                     button: PointerButton::Touch,
                     state: ElementState::Pressed,
+                    position: Some(touch_point.location.to_physical(scale_factor)),
+                    force: None,
+                    tilt: None,
                 },
             },
             window_id,
@@ -87,6 +91,9 @@ impl TouchHandler for WinitState {
                 event: PointerEvent::Button {
                     button: PointerButton::Touch,
                     state: ElementState::Released,
+                    position: None,
+                    force: None,
+                    tilt: None,
                 },
             },
             window_id,
@@ -124,7 +131,11 @@ impl TouchHandler for WinitState {
                     DeviceId,
                 )),
                 pointer_id: PointerId::Touch { finger: id as u64 },
-                event: PointerEvent::Moved(touch_point.location.to_physical(scale_factor)),
+                event: PointerEvent::Moved {
+                    position: touch_point.location.to_physical(scale_factor),
+                    force: None,
+                    tilt: None,
+                },
             },
             window_id,
         );

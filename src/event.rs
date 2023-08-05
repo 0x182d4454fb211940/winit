@@ -866,13 +866,17 @@ pub enum PointerEvent {
     Destroyed,
     Entered,
     Left,
-    UpdateForce(Force),
-    UpdateTilt(Tilt),
-    UpdateAngle(f64),
-    Moved(PhysicalPosition<f64>),
+    Moved {
+        position: PhysicalPosition<f64>,
+        force: Option<Force>,
+        tilt: Option<Tilt>,
+    },
     Button {
         button: PointerButton,
         state: ElementState,
+        position: Option<PhysicalPosition<f64>>,
+        force: Option<Force>,
+        tilt: Option<Tilt>,
     },
     MotionCancelled,
 }
@@ -1000,6 +1004,13 @@ pub enum PointerButton {
     Mouse(MouseButton),
     // Touch (probably) doesn't have any variations, different fingers
     // are different pointers.
+    Touch,
+    Pen(PenButton),
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum PenButton {
     Touch,
 }
 

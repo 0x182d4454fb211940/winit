@@ -138,7 +138,11 @@ impl PointerHandler for WinitState {
                         WindowEvent::Pointer {
                             device_id,
                             pointer_id: PointerId::Cursor,
-                            event: OutPointerEvent::Moved(position),
+                            event: OutPointerEvent::Moved {
+                                position,
+                                force: None,
+                                tilt: None,
+                            },
                         },
                         window_id,
                     );
@@ -165,7 +169,11 @@ impl PointerHandler for WinitState {
                         WindowEvent::Pointer {
                             device_id,
                             pointer_id: PointerId::Cursor,
-                            event: OutPointerEvent::Moved(position),
+                            event: OutPointerEvent::Moved {
+                                position,
+                                force: None,
+                                tilt: None,
+                            },
                         },
                         window_id,
                     );
@@ -193,6 +201,9 @@ impl PointerHandler for WinitState {
                             event: OutPointerEvent::Button {
                                 button: PointerButton::Mouse(button),
                                 state,
+                                position: Some(position),
+                                force: None,
+                                tilt: None,
                             },
                         },
                         window_id,
