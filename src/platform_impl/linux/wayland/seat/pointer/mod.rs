@@ -22,7 +22,8 @@ use sctk::shell::xdg::frame::FrameClick;
 
 use crate::dpi::{LogicalPosition, PhysicalPosition};
 use crate::event::{
-    ElementState, MouseButton, MouseScrollDelta, PointerId, TouchPhase, WindowEvent,
+    ElementState, MouseButton, MouseScrollDelta, PointerButton, PointerEvent as OutPointerEvent,
+    PointerId, TouchPhase, WindowEvent,
 };
 
 use crate::platform_impl::wayland::state::WinitState;
@@ -118,9 +119,10 @@ impl PointerHandler for WinitState {
                 // Regular events on the main surface.
                 PointerEventKind::Enter { .. } => {
                     self.events_sink.push_window_event(
-                        WindowEvent::PointerEntered {
+                        WindowEvent::Pointer {
                             device_id,
-                            source: PointerId::Cursor,
+                            pointer_id: PointerId::Cursor,
+                            event: OutPointerEvent::Entered,
                         },
                         window_id,
                     );
@@ -133,11 +135,10 @@ impl PointerHandler for WinitState {
                     pointer.winit_data().inner.lock().unwrap().surface = Some(window_id);
 
                     self.events_sink.push_window_event(
-                        WindowEvent::PointerMoved {
+                        WindowEvent::Pointer {
                             device_id,
-                            location: position,
-                            source: PointerId::Cursor,
-                            force: None,
+                            pointer_id: PointerId::Cursor,
+                            event: OutPointerEvent::Moved(position),
                         },
                         window_id,
                     );
@@ -151,20 +152,20 @@ impl PointerHandler for WinitState {
                     pointer.winit_data().inner.lock().unwrap().surface = None;
 
                     self.events_sink.push_window_event(
-                        WindowEvent::PointerLeft {
+                        WindowEvent::Pointer {
                             device_id,
-                            source: PointerId::Cursor,
+                            pointer_id: PointerId::Cursor,
+                            event: OutPointerEvent::Left,
                         },
                         window_id,
                     );
                 }
                 PointerEventKind::Motion { .. } => {
                     self.events_sink.push_window_event(
-                        WindowEvent::PointerMoved {
+                        WindowEvent::Pointer {
                             device_id,
-                            location: position,
-                            source: PointerId::Cursor,
-                            force: None,
+                            pointer_id: PointerId::Cursor,
+                            event: OutPointerEvent::Moved(position),
                         },
                         window_id,
                     );
@@ -186,13 +187,13 @@ impl PointerHandler for WinitState {
                         ElementState::Released
                     };
                     self.events_sink.push_window_event(
-                        WindowEvent::PointerButton {
+                        WindowEvent::Pointer {
                             device_id,
-                            source: PointerId::Cursor,
-                            state,
-                            button: Some(button),
-                            location: None,
-                            force: None,
+                            pointer_id: PointerId::Cursor,
+                            event: OutPointerEvent::Button {
+                                button: PointerButton::Mouse(button),
+                                state,
+                            },
                         },
                         window_id,
                     );

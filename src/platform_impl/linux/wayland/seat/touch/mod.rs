@@ -8,7 +8,7 @@ use sctk::reexports::client::{Connection, Proxy, QueueHandle};
 use sctk::seat::touch::{TouchData, TouchHandler};
 
 use crate::dpi::{LogicalPosition, PhysicalPosition};
-use crate::event::{ElementState, PointerId, WindowEvent};
+use crate::event::{ElementState, PointerButton, PointerEvent, PointerId, WindowEvent};
 
 use crate::platform_impl::wayland::state::WinitState;
 use crate::platform_impl::wayland::{self, DeviceId};
@@ -41,15 +41,15 @@ impl TouchHandler for WinitState {
             .insert(id, TouchPoint { surface, location });
 
         self.events_sink.push_window_event(
-            WindowEvent::PointerButton {
+            WindowEvent::Pointer {
                 device_id: crate::event::DeviceId(crate::platform_impl::DeviceId::Wayland(
                     DeviceId,
                 )),
-                source: PointerId::Touch { finger: id as u64 },
-                force: None,
-                location: Some(location.to_physical(scale_factor)),
-                state: ElementState::Pressed,
-                button: None,
+                pointer_id: PointerId::Touch { finger: id as u64 },
+                event: PointerEvent::Button {
+                    button: PointerButton::Touch,
+                    state: ElementState::Pressed,
+                },
             },
             window_id,
         );
@@ -79,15 +79,15 @@ impl TouchHandler for WinitState {
         };
 
         self.events_sink.push_window_event(
-            WindowEvent::PointerButton {
+            WindowEvent::Pointer {
                 device_id: crate::event::DeviceId(crate::platform_impl::DeviceId::Wayland(
                     DeviceId,
                 )),
-                source: PointerId::Touch { finger: id as u64 },
-                state: ElementState::Released,
-                button: None,
-                location: None,
-                force: None,
+                pointer_id: PointerId::Touch { finger: id as u64 },
+                event: PointerEvent::Button {
+                    button: PointerButton::Touch,
+                    state: ElementState::Released,
+                },
             },
             window_id,
         );
@@ -119,13 +119,12 @@ impl TouchHandler for WinitState {
         touch_point.location = LogicalPosition::<f64>::from(position);
 
         self.events_sink.push_window_event(
-            WindowEvent::PointerMoved {
+            WindowEvent::Pointer {
                 device_id: crate::event::DeviceId(crate::platform_impl::DeviceId::Wayland(
                     DeviceId,
                 )),
-                source: PointerId::Touch { finger: id as u64 },
-                location: touch_point.location.to_physical(scale_factor),
-                force: None,
+                pointer_id: PointerId::Touch { finger: id as u64 },
+                event: PointerEvent::Moved(touch_point.location.to_physical(scale_factor)),
             },
             window_id,
         );
@@ -144,11 +143,12 @@ impl TouchHandler for WinitState {
             let location: PhysicalPosition<f64> = touch_point.location.to_physical(scale_factor);
 
             self.events_sink.push_window_event(
-                WindowEvent::PointerCancelled {
+                WindowEvent::Pointer {
                     device_id: crate::event::DeviceId(crate::platform_impl::DeviceId::Wayland(
                         DeviceId,
                     )),
-                    source: PointerId::Touch { finger: id as u64 },
+                    pointer_id: PointerId::Touch { finger: id as u64 },
+                    event: PointerEvent::MotionCancelled,
                 },
                 window_id,
             )
