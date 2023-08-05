@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use once_cell::sync::OnceCell;
 use wayland_client::{
-    delegate_dispatch,
     globals::GlobalList,
     protocol::{wl_seat::WlSeat, wl_surface::WlSurface},
     Dispatch, QueueHandle, WEnum,
@@ -121,149 +120,8 @@ impl Dispatch<ZwpTabletToolV2, ToolData> for WinitState {
         _qhandle: &QueueHandle<Self>,
     ) {
         match event {
-            Event::Type {
-                tool_type: WEnum::Value(ty),
-            } => {
-                let ty = match ty {
-                    Type::Pen => Tool::Pen,
-                    Type::Eraser => Tool::Eraser,
-                    _ => return,
-                };
-                data.tool_type.get_or_init(|| ty);
-                state
-                    .tablet
-                    .as_mut()
-                    .unwrap()
-                    .tools
-                    .insert(ty, ToolState::default());
-            }
-            Event::Pressure { pressure } => {
-                data.state_mut(state).pressure = Some(pressure);
-            }
-            Event::Tilt { tilt_x, tilt_y } => {
-                data.state_mut(state).tilt = Some(Tilt {
-                    angle_x: tilt_x,
-                    angle_y: tilt_y,
-                });
-            }
-            Event::Motion { x, y } => {
-                let tool_state = data.state_mut(state);
-                let surface = match tool_state.surface.as_ref() {
-                    Some(x) => x,
-                    None => return,
-                };
-                let window_id = wayland::make_wid(&surface);
-                let scale_factor = match state.windows.get_mut().get(&window_id) {
-                    Some(window) => window.lock().unwrap().scale_factor(),
-                    None => return,
-                };
-                let tool_state = data.state_mut(state);
-                let location = LogicalPosition::new(x, y);
-                tool_state.motion = Some(location.to_physical(scale_factor));
-            }
-            Event::Down { .. } => {
-                data.state_mut(state).down = true;
-            }
-            Event::Up { .. } => {
-                data.state_mut(state).up = true;
-            }
-            Event::ProximityIn { surface, .. } => {
-                let tool_state = data.state_mut(state);
-                let window_id = wayland::make_wid(&surface);
-                tool_state.surface = Some(surface);
-                let device_id =
-                    crate::event::DeviceId(crate::platform_impl::DeviceId::Wayland(DeviceId));
-                let pointer_id = PointerId::Pen {
-                    tool: *data.tool_type.get().unwrap(),
-                };
-                state.events_sink.push_window_event(
-                    WindowEvent::Pointer {
-                        device_id,
-                        pointer_id,
-                        event: PointerEvent::Entered,
-                    },
-                    window_id,
-                );
-            }
-            Event::ProximityOut => {
-                let tool_state = data.state_mut(state);
-                let surface = match tool_state.surface.as_ref() {
-                    Some(x) => x,
-                    None => return,
-                };
-                let window_id = wayland::make_wid(&surface);
-                let device_id =
-                    crate::event::DeviceId(crate::platform_impl::DeviceId::Wayland(DeviceId));
-                let pointer_id = PointerId::Pen {
-                    tool: *data.tool_type.get().unwrap(),
-                };
-                state.events_sink.push_window_event(
-                    WindowEvent::Pointer {
-                        device_id,
-                        pointer_id,
-                        event: PointerEvent::Left,
-                    },
-                    window_id,
-                );
-            }
-            Event::Frame { .. } => {
-                let tool_state = data.state_mut(state);
-                let surface = match tool_state.surface.as_ref() {
-                    Some(x) => x,
-                    None => return,
-                };
-
-                let window_id = wayland::make_wid(surface);
-                let device_id =
-                    crate::event::DeviceId(crate::platform_impl::DeviceId::Wayland(DeviceId));
-                let pointer_id = PointerId::Pen {
-                    tool: *data.tool_type.get().unwrap(),
-                };
-                let force = tool_state
-                    .pressure
-                    .take()
-                    .map(|pressure| Force::Normalized(pressure as f64 / 65535.0));
-                let tilt = tool_state.tilt.take();
-                let (down, up) = (
-                    std::mem::take(&mut tool_state.down),
-                    std::mem::take(&mut tool_state.up),
-                );
-                if down || up {
-                    let position = tool_state.motion.take();
-                    state.events_sink.push_window_event(
-                        WindowEvent::Pointer {
-                            device_id,
-                            pointer_id,
-                            event: PointerEvent::Button {
-                                button: PointerButton::Pen(PenButton::Touch),
-                                state: if down {
-                                    ElementState::Pressed
-                                } else {
-                                    ElementState::Released
-                                },
-                                position,
-                                force,
-                                tilt,
-                            },
-                        },
-                        window_id,
-                    );
-                    return;
-                }
-                if let Some(position) = tool_state.motion.take() {
-                    state.events_sink.push_window_event(
-                        WindowEvent::Pointer {
-                            device_id,
-                            pointer_id,
-                            event: PointerEvent::Moved {
-                                position,
-                                force,
-                                tilt,
-                            },
-                        },
-                        window_id,
-                    );
-                }
+            Event::ProximityIn { .. } | Event::ProximityOut => {
+                println!("proximity event: {event:?}")
             }
             _ => (),
         }
