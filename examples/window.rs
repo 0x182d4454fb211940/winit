@@ -2,7 +2,7 @@
 
 use simple_logger::SimpleLogger;
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, PointerEvent, WindowEvent},
     event_loop::EventLoop,
     window::WindowBuilder,
 };
@@ -22,7 +22,6 @@ fn main() -> Result<(), impl std::error::Error> {
 
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_wait();
-        println!("{event:?}");
 
         match event {
             Event::WindowEvent {
@@ -31,6 +30,20 @@ fn main() -> Result<(), impl std::error::Error> {
             } if window_id == window.id() => control_flow.set_exit(),
             Event::AboutToWait => {
                 // window.request_redraw();
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::Pointer {
+                        event: PointerEvent::Moved { .. },
+                        ..
+                    },
+                ..
+            } => (),
+            Event::WindowEvent {
+                event: event @ WindowEvent::Pointer { .. },
+                ..
+            } => {
+                println!("{event:?}")
             }
             Event::RedrawRequested(_) => {
                 // Notify the windowing system that we'll be presenting to the window.

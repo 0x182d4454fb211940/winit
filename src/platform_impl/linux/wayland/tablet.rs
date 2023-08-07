@@ -13,7 +13,7 @@ use wayland_protocols::wp::tablet::zv2::client::{
     zwp_tablet_seat_v2::{
         ZwpTabletSeatV2, EVT_PAD_ADDED_OPCODE, EVT_TABLET_ADDED_OPCODE, EVT_TOOL_ADDED_OPCODE,
     },
-    zwp_tablet_tool_v2::{Event, Type, ZwpTabletToolV2},
+    zwp_tablet_tool_v2::{ButtonState, Event, Type, ZwpTabletToolV2},
     zwp_tablet_v2::ZwpTabletV2,
 };
 
@@ -107,6 +107,7 @@ struct ToolState {
     pressure: Option<u32>,
     tilt: Option<Tilt>,
     motion: Option<PhysicalPosition<f64>>,
+    button_pressed: Option<ElementState>,
     down: bool,
     up: bool,
 }
@@ -206,6 +207,16 @@ impl Dispatch<ZwpTabletToolV2, ToolData> for WinitState {
                     window_id,
                 );
             }
+            Event::Button {
+                state: button_state,
+                ..
+            } => {
+                data.state_mut(state).button_pressed = Some(match button_state {
+                    WEnum::Value(ButtonState::Pressed) => ElementState::Pressed,
+                    WEnum::Value(ButtonState::Released) => ElementState::Released,
+                    _ => panic!(),
+                });
+            }
             Event::Frame { .. } => {
                 let tool_state = data.state_mut(state);
                 let surface = match tool_state.surface.as_ref() {
@@ -228,19 +239,64 @@ impl Dispatch<ZwpTabletToolV2, ToolData> for WinitState {
                     std::mem::take(&mut tool_state.down),
                     std::mem::take(&mut tool_state.up),
                 );
-                if down || up {
-                    let position = tool_state.motion.take();
+                let button = tool_state.button_pressed.take();
+                let position = tool_state.motion.take();
+                if down {
                     state.events_sink.push_window_event(
                         WindowEvent::Pointer {
                             device_id,
                             pointer_id,
                             event: PointerEvent::Button {
                                 button: PointerButton::Pen(PenButton::Touch),
-                                state: if down {
-                                    ElementState::Pressed
-                                } else {
-                                    ElementState::Released
+                                state: ElementState::Pressed,
+                                position,
+                                force,
+                                tilt,
+                            },
+                        },
+                        window_id,
+                    );
+                    if let Some(button) = button {
+                        state.events_sink.push_window_event(
+                            WindowEvent::Pointer {
+                                device_id,
+                                pointer_id,
+                                event: PointerEvent::Button {
+                                    button: PointerButton::Pen(PenButton::Side),
+                                    state: button,
+                                    position,
+                                    force,
+                                    tilt,
                                 },
+                            },
+                            window_id,
+                        );
+                    }
+                    return;
+                } else if up {
+                    if let Some(button) = button {
+                        state.events_sink.push_window_event(
+                            WindowEvent::Pointer {
+                                device_id,
+                                pointer_id,
+                                event: PointerEvent::Button {
+                                    button: PointerButton::Pen(PenButton::Side),
+                                    state: button,
+                                    position,
+                                    force,
+                                    tilt,
+                                },
+                            },
+                            window_id,
+                        );
+                    }
+                    state.events_sink.push_window_event(
+                        WindowEvent::Pointer {
+                            device_id,
+                            pointer_id,
+                            event: PointerEvent::Button {
+                                button: PointerButton::Pen(PenButton::Touch),
+                                state: ElementState::Released,
                                 position,
                                 force,
                                 tilt,
@@ -249,20 +305,37 @@ impl Dispatch<ZwpTabletToolV2, ToolData> for WinitState {
                         window_id,
                     );
                     return;
-                }
-                if let Some(position) = tool_state.motion.take() {
-                    state.events_sink.push_window_event(
-                        WindowEvent::Pointer {
-                            device_id,
-                            pointer_id,
-                            event: PointerEvent::Moved {
-                                position,
-                                force,
-                                tilt,
+                } else {
+                    if let Some(button) = button {
+                        state.events_sink.push_window_event(
+                            WindowEvent::Pointer {
+                                device_id,
+                                pointer_id,
+                                event: PointerEvent::Button {
+                                    button: PointerButton::Pen(PenButton::Side),
+                                    state: button,
+                                    position,
+                                    force,
+                                    tilt,
+                                },
                             },
-                        },
-                        window_id,
-                    );
+                            window_id,
+                        );
+                    }
+                    if let Some(position) = position {
+                        state.events_sink.push_window_event(
+                            WindowEvent::Pointer {
+                                device_id,
+                                pointer_id,
+                                event: PointerEvent::Moved {
+                                    position,
+                                    force,
+                                    tilt,
+                                },
+                            },
+                            window_id,
+                        );
+                    }
                 }
             }
             _ => (),

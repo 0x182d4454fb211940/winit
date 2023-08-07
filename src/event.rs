@@ -1012,6 +1012,7 @@ pub enum PointerButton {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum PenButton {
     Touch,
+    Side,
 }
 
 /// Describes a difference in the mouse scroll wheel state.
